@@ -12,7 +12,9 @@
 var $excel_btn,
     addInterval,
     columnHeadings = ['Card ID','List', 'Title', 'Description', 'Points', 'Due', 'Members', 'Labels'],
-	commentHeadings = ['Card ID', 'Title', 'Comment', 'Author', 'Date'];
+	commentHeadings = ['Card ID', 'Title', 'Comment', 'Author', 'Date'],
+	checklistHeadings = ['Card ID', 'Title', 'Checklist Name', 'Checklist Item', 'Status'],
+	cardNames = [];
 
 window.URL = window.webkitURL || window.URL;
 
@@ -63,7 +65,7 @@ function createExcelExport() {
     $.getJSON($('a.js-export-json').attr('href'), function (data) {
             
         var file = {
-            worksheets: [[],[],[]], // worksheets has one empty worksheet (array)
+            worksheets: [[],[],[],[]], // worksheets has one empty worksheet (array)
             creator: 'TrelloExport',
             created: new Date(),
             lastModifiedBy: 'TrelloExport',
@@ -78,15 +80,22 @@ function createExcelExport() {
             w.data.push([]);
             w.data[0] = columnHeadings;
             
-			// Setup the active list and cart worksheet
+			// Setup the comments worksheet
             wComments = file.worksheets[1]; 
             wComments.name = 'Comments on ' + data.name;
             wComments.data = [];
             wComments.data.push([]);
             wComments.data[0] = commentHeadings;
+			
+			// Setup the checklists worksheet
+            wChecklists = file.worksheets[2]; 
+            wChecklists.name = 'Checklists ' + data.name;
+            wChecklists.data = [];
+            wChecklists.data.push([]);
+            wChecklists.data[0] = checklistHeadings;
             
             // Setup the archive list and cart worksheet            
-            wArchived = file.worksheets[2]; 
+            wArchived = file.worksheets[3]; 
             wArchived.name = 'Archived ' + data.name;
             wArchived.data = [];
             wArchived.data.push([]);
@@ -102,6 +111,7 @@ function createExcelExport() {
                     listName = '[archived] ' + listName;
                 }
                 
+				
                 // Iterate through each card and transform data as needed
                 $.each(data.cards, function (i, card) {
                 if (card.idList == list_id) {
@@ -114,7 +124,9 @@ function createExcelExport() {
                     if (card.closed) {
                         title = '[archived] ' + title;
                     }
-                    
+					
+					cardNames[card.id] = [title, card.idShort];
+
                     var due = card.due || '';
                     
                     //Get all the Member IDs
@@ -186,6 +198,31 @@ function createExcelExport() {
 				var rComment = wComments.data.push([]) - 1;
 				wComments.data[rComment] = rowData;		
 			}
+		});
+		
+		// Move all checklists to their own worksheet
+		$.each(data.checklists, function (i, checklist) {
+			var rowData = [
+					cardNames[checklist.idCard][1],
+					cardNames[checklist.idCard][0],
+					checklist.name,
+					"",
+					""
+					];
+						
+			var rChecklists = wChecklists.data.push([]) - 1;
+			wChecklists.data[rChecklists] = rowData;
+
+			$.each(checklist.checkItems, function (i, checkitem) {
+				var rowData = ["",
+						"",
+						"",
+						checkitem.name,
+						checkitem.state];
+						
+				var rChecklists = wChecklists.data.push([]) - 1;
+				wChecklists.data[rChecklists] = rowData;
+			});
 		});
 		
 		wComments.data.sort(sortComments);
