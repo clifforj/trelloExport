@@ -1,15 +1,18 @@
 /*!
  * TrelloExport
- * https://github.com/llad/trelloExport
+ * https://github.com/clifforj/trelloExport
  *
  * Credit:
  * Started from: https://github.com/Q42/TrelloScrum
+ * Forked from: https://github.com/llad/trelloExport
+ * Expanded by: John Clifford - @ilikepixels 
  */
 
 // Variables
 var $excel_btn,
     addInterval,
-    columnHeadings = ['List', 'Title', 'Description', 'Points', 'Due', 'Members', 'Labels'];
+    columnHeadings = ['Card ID','List', 'Title', 'Description', 'Points', 'Due', 'Members', 'Labels'],
+	commentHeadings = ['Card ID', 'Title', 'Comment', 'Author', 'Date'];
 
 window.URL = window.webkitURL || window.URL;
 
@@ -52,6 +55,7 @@ function addExportLink() {
 }
 
 function createExcelExport() {
+	$('.js-export-excel').text('Export Excel - (Working...)');
 
     // RegEx to find the points for users of TrelloScrum
     var pointReg = /[\(](\x3f|\d*\.?\d+)([\)])\s?/m;
@@ -59,7 +63,7 @@ function createExcelExport() {
     $.getJSON($('a.js-export-json').attr('href'), function (data) {
             
         var file = {
-            worksheets: [[],[]], // worksheets has one empty worksheet (array)
+            worksheets: [[],[],[]], // worksheets has one empty worksheet (array)
             creator: 'TrelloExport',
             created: new Date(),
             lastModifiedBy: 'TrelloExport',
@@ -74,9 +78,15 @@ function createExcelExport() {
             w.data.push([]);
             w.data[0] = columnHeadings;
             
+			// Setup the active list and cart worksheet
+            wComments = file.worksheets[1]; 
+            wComments.name = 'Comments on ' + data.name;
+            wComments.data = [];
+            wComments.data.push([]);
+            wComments.data[0] = commentHeadings;
             
             // Setup the archive list and cart worksheet            
-            wArchived = file.worksheets[1]; 
+            wArchived = file.worksheets[2]; 
             wArchived.name = 'Archived ' + data.name;
             wArchived.data = [];
             wArchived.data.push([]);
@@ -137,6 +147,7 @@ function createExcelExport() {
                     }
                     
                     var rowData = [
+							card.idShort,
                             listName,
                             title,
                             card.desc,
@@ -160,6 +171,34 @@ function createExcelExport() {
                 }
             });
         });
+		
+		// Move all comments to their own worksheet
+		$.each(data.actions, function (i, action) {
+			if(action.type == 'commentCard') {
+				var rowData = [
+						action.data.card.idShort,
+						action.data.card.name,
+						action.data.text,
+						action.memberCreator.initials,
+						new Date(action.date)
+						];
+						
+				var rComment = wComments.data.push([]) - 1;
+				wComments.data[rComment] = rowData;		
+			}
+		});
+		
+		wComments.data.sort(sortComments);
+		
+		function sortComments(a, b)
+		{
+			var result = 0;
+			
+			if(a[0] < b[0]) result = 1;
+			if(a[0] > b[0]) result = -1;
+			
+			return result;
+		}
         
         // We want just the base64 part of the output of xlsx.js
         // since we are not leveraging they standard transfer process.
@@ -179,8 +218,6 @@ function createExcelExport() {
         var board_title = data.name;
         saveAs(blob, board_title + '.xlsx');
         $("a.close-btn")[0].click();
-
-
     });
 
 }
